@@ -51,9 +51,27 @@ class ApiService {
         tokenSource = 'client (endpoint match)';
       } else if (endpoint.includes('/user/') || endpoint.includes('/auth/user/') || endpoint.includes('/users/') || 
                  endpoint.includes('/mobile/chat') || endpoint.includes('/mobile/voice') || endpoint.includes('/mobile/user/')) {
-        // Mobile endpoints (chat, voice, user profile) use user token
+        // CRITICAL: Mobile endpoints (chat, voice, user profile) MUST use user token
+        // These endpoints are ONLY for 'user' role
         token = getTokenForRole('user');
-        tokenSource = 'user (mobile endpoint match)';
+        tokenSource = 'user (mobile endpoint - user role required)';
+        
+        // Warn if no user token found but other tokens exist
+        if (!token) {
+          const otherTokens = {
+            super_admin: !!localStorage.getItem('token_super_admin'),
+            admin: !!localStorage.getItem('token_admin'),
+            client: !!localStorage.getItem('token_client')
+          };
+          const hasOtherTokens = Object.values(otherTokens).some(v => v);
+          if (hasOtherTokens) {
+            console.warn('[API Warning]', {
+              endpoint,
+              message: 'Mobile endpoint requires user token, but user is not logged in. Other roles are logged in.',
+              otherTokens
+            });
+          }
+        }
       } else {
         // Try to get token from current route
         token = getTokenForRole();
@@ -92,14 +110,34 @@ class ApiService {
 
       // Debug logging for errors
       if (!response.ok) {
-        console.error('[API Error]', {
-          endpoint,
-          status: response.status,
-          statusText: response.statusText,
-          error: data.message || 'Request failed',
-          hasToken: !!token,
-          responseData: data
-        });
+        // Check for role mismatch errors
+        if (response.status === 403 && data.error === 'INVALID_ROLE') {
+          console.error('[API Error - Role Mismatch]', {
+            endpoint,
+            status: response.status,
+            requiredRole: data.requiredRole,
+            currentRole: data.currentRole,
+            message: data.message,
+            hasToken: !!token,
+            tokenSource
+          });
+          
+          // Show user-friendly error for role mismatch
+          if (data.currentRole && data.requiredRole) {
+            const errorMsg = `You are logged in as '${data.currentRole}' but this feature requires '${data.requiredRole}' role. Please logout and login as a user.`;
+            console.error('[Role Mismatch]', errorMsg);
+            // You can trigger a notification/toast here if needed
+          }
+        } else {
+          console.error('[API Error]', {
+            endpoint,
+            status: response.status,
+            statusText: response.statusText,
+            error: data.message || 'Request failed',
+            hasToken: !!token,
+            responseData: data
+          });
+        }
         throw new Error(data.message || 'Request failed');
       }
 
