@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://backend-jfg8.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Helper to get role from path
 const getRoleFromPath = (path) => {
@@ -45,7 +45,9 @@ class ApiService {
         token = getTokenForRole('admin');
       } else if (endpoint.includes('/client/') || endpoint.includes('/auth/client/')) {
         token = getTokenForRole('client');
-      } else if (endpoint.includes('/user/') || endpoint.includes('/auth/user/') || endpoint.includes('/users/')) {
+      } else if (endpoint.includes('/user/') || endpoint.includes('/auth/user/') || endpoint.includes('/users/') || 
+                 endpoint.includes('/mobile/chat') || endpoint.includes('/mobile/voice') || endpoint.includes('/mobile/user/')) {
+        // Mobile endpoints (chat, voice, user profile) use user token
         token = getTokenForRole('user');
       } else {
         // Try to get token from current route
