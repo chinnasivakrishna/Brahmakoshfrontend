@@ -40,6 +40,13 @@ const routes = [
     component: () => import('../views/auth/UserRegister.jsx'),
     meta: { requiresGuest: true }
   },
+  // Mobile User Registration (Multi-step with OTP)
+  {
+    path: '/mobile/user/register',
+    name: 'MobileUserRegister',
+    component: () => import('../views/mobile/MobileUserRegister.jsx'),
+    meta: { requiresGuest: true }
+  },
   {
     path: '/',
     redirect: '/user/login'
@@ -53,6 +60,30 @@ const routes = [
         path: '',
         name: 'Dashboard',
         component: () => import('../views/Dashboard.jsx')
+      }
+    ]
+  },
+  // Mobile User Routes (Chat & Voice)
+  {
+    path: '/mobile/user',
+    component: () => import('../layouts/MobileUserLayout.jsx'),
+    meta: { requiresAuth: true, requiresRole: 'user' },
+    redirect: '/mobile/user/dashboard',
+    children: [
+      {
+        path: 'dashboard',
+        name: 'MobileUserDashboard',
+        component: () => import('../views/mobile/MobileUserDashboard.jsx')
+      },
+      {
+        path: 'chat',
+        name: 'MobileChatPage',
+        component: () => import('../views/mobile/MobileChatPage.jsx')
+      },
+      {
+        path: 'voice',
+        name: 'MobileVoicePage',
+        component: () => import('../views/mobile/MobileVoicePage.jsx')
       }
     ]
   },
@@ -215,6 +246,7 @@ const getRoleFromPath = (path) => {
   if (path.startsWith('/super-admin')) return 'super_admin';
   if (path.startsWith('/admin')) return 'admin';
   if (path.startsWith('/client')) return 'client';
+  if (path.startsWith('/mobile/user')) return 'user'; // Check mobile/user before /user
   if (path.startsWith('/user')) return 'user';
   return null;
 };
@@ -290,6 +322,8 @@ router.beforeEach(async (to, from, next) => {
       next('/admin/overview');
     } else if (targetRole === 'client') {
       next('/client/overview');
+    } else if (targetRole === 'user') {
+      next('/mobile/user/dashboard'); // Redirect mobile users to mobile dashboard
     } else {
       next('/dashboard');
     }

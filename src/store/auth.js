@@ -150,6 +150,40 @@ export function useAuth() {
     }
   };
 
+  // Firebase authentication methods
+  const firebaseLogin = async (idToken, role = 'user') => {
+    loading.value = true;
+    try {
+      const response = await api.firebaseSignIn(idToken);
+      
+      const tokenValue = response.data.token;
+      const userData = response.data.user;
+      
+      if (userData) {
+        userData.role = role;
+      }
+
+      // Store in role-specific state (for user role)
+      userToken.value = tokenValue;
+      userUser.value = userData;
+      localStorage.setItem('token_user', tokenValue);
+      
+      return response;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const firebaseSignUp = async (idToken) => {
+    loading.value = true;
+    try {
+      const response = await api.firebaseSignUp(idToken);
+      return response;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const register = async (email, password, role, additionalData = {}) => {
     loading.value = true;
     try {
@@ -320,6 +354,8 @@ export function useAuth() {
     loading,
     isAuthenticated,
     userRole,
+    firebaseLogin,
+    firebaseSignUp,
     isSuperAdmin,
     isAdmin,
     isClient,

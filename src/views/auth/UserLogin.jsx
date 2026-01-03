@@ -19,9 +19,11 @@ export default {
       error.value = '';
       
       try {
-        const response = await api.userLogin(email.value, password.value);
+        // Login will handle API call and token storage
         await login(email.value, password.value, 'user');
-        router.push('/dashboard');
+        // Redirect to mobile dashboard (chat/voice features)
+        // Token is stored synchronously in login(), so navigation should work immediately
+        router.push('/mobile/user/dashboard');
       } catch (err) {
         error.value = err.message || 'Login failed';
       } finally {
@@ -61,7 +63,14 @@ export default {
               {loading.value ? 'Logging in...' : 'Login'}
             </button>
             <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#6b7280' }}>
-              Don't have an account? <RouterLink to="/user/register" style={{ color: '#6366f1', textDecoration: 'none' }}>Register here</RouterLink>
+              Don't have an account?{' '}
+              <RouterLink to="/mobile/user/register" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 'bold' }}>
+                Register with Mobile (OTP)
+              </RouterLink>
+              {' or '}
+              <RouterLink to="/user/register" style={{ color: '#6366f1', textDecoration: 'none' }}>
+                Standard Register
+              </RouterLink>
             </p>
           </form>
         </div>

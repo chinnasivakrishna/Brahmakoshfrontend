@@ -141,6 +141,143 @@ class ApiService {
     return this.request('/auth/user/me', { token });
   }
 
+  // Mobile User Registration (Multi-step with OTP)
+  async mobileUserRegisterStep1(email, password) {
+    return this.request('/mobile/user/register/step1', {
+      method: 'POST',
+      body: { email, password },
+    });
+  }
+
+  async mobileUserRegisterStep1Verify(email, otp) {
+    return this.request('/mobile/user/register/step1/verify', {
+      method: 'POST',
+      body: { email, otp },
+    });
+  }
+
+  async mobileUserRegisterStep2(email, mobile) {
+    return this.request('/mobile/user/register/step2', {
+      method: 'POST',
+      body: { email, mobile },
+    });
+  }
+
+  async mobileUserRegisterStep2Verify(email, otp) {
+    return this.request('/mobile/user/register/step2/verify', {
+      method: 'POST',
+      body: { email, otp },
+    });
+  }
+
+  async mobileUserRegisterStep3(email, profileData, imageFileName, imageContentType) {
+    return this.request('/mobile/user/register/step3', {
+      method: 'POST',
+      body: { 
+        email, 
+        ...profileData,
+        imageFileName,
+        imageContentType
+      },
+    });
+  }
+
+  async resendEmailOTP(email) {
+    return this.request('/mobile/user/register/resend-email-otp', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  async resendMobileOTP(email) {
+    return this.request('/mobile/user/register/resend-mobile-otp', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  // Mobile User Login (after registration is complete)
+  async mobileUserLogin(email, password) {
+    return this.request('/auth/user/login', {
+      method: 'POST',
+      body: { email, password },
+    });
+  }
+
+  // Firebase Authentication endpoints
+  async firebaseSignUp(idToken) {
+    return this.request('/mobile/user/register/firebase', {
+      method: 'POST',
+      body: { idToken },
+    });
+  }
+
+  async firebaseSignIn(idToken) {
+    return this.request('/mobile/user/login/firebase', {
+      method: 'POST',
+      body: { idToken },
+    });
+  }
+
+  // Chat APIs
+  async createChat(token, title = null) {
+    return this.request('/mobile/chat', {
+      method: 'POST',
+      token,
+      body: title ? { title } : {},
+    });
+  }
+
+  async getChats(token) {
+    return this.request('/mobile/chat', {
+      method: 'GET',
+      token,
+    });
+  }
+
+  async getChat(chatId, token) {
+    return this.request(`/mobile/chat/${chatId}`, {
+      method: 'GET',
+      token,
+    });
+  }
+
+  async sendChatMessage(chatId, message, token) {
+    return this.request(`/mobile/chat/${chatId}/message`, {
+      method: 'POST',
+      token,
+      body: { message },
+    });
+  }
+
+  async deleteChat(chatId, token) {
+    return this.request(`/mobile/chat/${chatId}`, {
+      method: 'DELETE',
+      token,
+    });
+  }
+
+  // Voice APIs
+  async startVoiceSession(token, existingChatId = null) {
+    return this.request('/mobile/voice/start', {
+      method: 'POST',
+      token,
+      body: existingChatId ? { chatId: existingChatId } : {},
+    });
+  }
+
+  async processVoice(chatId, audioData, token, audioFormat = 'linear16') {
+    return this.request('/mobile/voice/process', {
+      method: 'POST',
+      token,
+      body: {
+        chatId,
+        audioData,
+        audioFormat,
+      },
+    });
+  }
+
   // Super Admin endpoints
   async getAdmins() {
     return this.request('/super-admin/admins');
