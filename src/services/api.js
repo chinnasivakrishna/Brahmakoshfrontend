@@ -36,24 +36,39 @@ class ApiService {
   async request(endpoint, options = {}) {
     // Get token from options or determine from endpoint/context
     let token = options.token;
+    let tokenSource = 'provided';
     
     if (!token) {
       // Determine role from endpoint
       if (endpoint.includes('/super-admin/') || endpoint.includes('/auth/super-admin/')) {
         token = getTokenForRole('super_admin');
+        tokenSource = 'super_admin (endpoint match)';
       } else if (endpoint.includes('/admin/') || endpoint.includes('/auth/admin/')) {
         token = getTokenForRole('admin');
+        tokenSource = 'admin (endpoint match)';
       } else if (endpoint.includes('/client/') || endpoint.includes('/auth/client/')) {
         token = getTokenForRole('client');
+        tokenSource = 'client (endpoint match)';
       } else if (endpoint.includes('/user/') || endpoint.includes('/auth/user/') || endpoint.includes('/users/') || 
                  endpoint.includes('/mobile/chat') || endpoint.includes('/mobile/voice') || endpoint.includes('/mobile/user/')) {
         // Mobile endpoints (chat, voice, user profile) use user token
         token = getTokenForRole('user');
+        tokenSource = 'user (mobile endpoint match)';
       } else {
         // Try to get token from current route
         token = getTokenForRole();
+        tokenSource = 'fallback (route detection)';
       }
     }
+    
+    // Debug logging
+    console.log('[API Request]', {
+      endpoint,
+      hasToken: !!token,
+      tokenSource,
+      tokenLength: token ? token.length : 0,
+      tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+    });
     
     const config = {
       headers: {
@@ -75,12 +90,26 @@ class ApiService {
       const response = await fetch(`${this.baseURL}${endpoint}`, config);
       const data = await response.json();
 
+      // Debug logging for errors
       if (!response.ok) {
+        console.error('[API Error]', {
+          endpoint,
+          status: response.status,
+          statusText: response.statusText,
+          error: data.message || 'Request failed',
+          hasToken: !!token,
+          responseData: data
+        });
         throw new Error(data.message || 'Request failed');
       }
 
       return data;
     } catch (error) {
+      console.error('[API Exception]', {
+        endpoint,
+        error: error.message,
+        hasToken: !!token
+      });
       throw error;
     }
   }

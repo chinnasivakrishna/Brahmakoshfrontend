@@ -5,7 +5,7 @@ import api from '../../services/api.js';
 export default {
   name: 'MobileChatPage',
   setup() {
-    const { token } = useAuth();
+    const { token, getTokenForRole } = useAuth();
     const chats = ref([]);
     const selectedChatId = ref(null);
     const messages = ref([]);
@@ -19,12 +19,43 @@ export default {
 
     const loadChats = async () => {
       try {
-        const data = await api.getChats(token.value);
+        // Get token explicitly for user role
+        const userToken = token.value || getTokenForRole('user');
+        
+        // Debug logging
+        console.log('[MobileChatPage] Loading chats:', {
+          hasTokenFromStore: !!token.value,
+          hasTokenFromRole: !!getTokenForRole('user'),
+          hasUserToken: !!userToken,
+          tokenLength: userToken ? userToken.length : 0,
+          tokenPreview: userToken ? userToken.substring(0, 20) + '...' : 'none',
+          tokenFromStore: token.value,
+          tokenFromRole: getTokenForRole('user'),
+          localStorageToken: localStorage.getItem('token_user'),
+          allLocalStorageTokens: {
+            user: localStorage.getItem('token_user'),
+            admin: localStorage.getItem('token_admin'),
+            client: localStorage.getItem('token_client'),
+            superAdmin: localStorage.getItem('token_super_admin')
+          }
+        });
+        
+        if (!userToken) {
+          console.error('[MobileChatPage] No token available for chat request');
+          throw new Error('Authentication required. Please login again.');
+        }
+        
+        const data = await api.getChats(userToken);
         if (data.success) {
           chats.value = data.data.chats;
         }
       } catch (error) {
-        console.error('Failed to load chats:', error);
+        console.error('[MobileChatPage] Failed to load chats:', {
+          error: error.message,
+          hasToken: !!token.value,
+          tokenFromStore: token.value,
+          localStorageToken: localStorage.getItem('token_user')
+        });
       } finally {
         chatLoading.value = false;
       }
@@ -32,7 +63,8 @@ export default {
 
     const loadChat = async (chatId) => {
       try {
-        const data = await api.getChat(chatId, token.value);
+        const userToken = token.value || getTokenForRole('user');
+        const data = await api.getChat(chatId, userToken);
         if (data.success) {
           messages.value = data.data.messages || [];
         }
@@ -43,7 +75,8 @@ export default {
 
     const handleNewChat = async () => {
       try {
-        const data = await api.createChat(token.value);
+        const userToken = token.value || getTokenForRole('user');
+        const data = await api.createChat(userToken);
         if (data.success) {
           selectedChatId.value = data.data.chatId;
           messages.value = [];
@@ -69,7 +102,8 @@ export default {
       loading.value = true;
 
       try {
-        const data = await api.sendChatMessage(selectedChatId.value, messageText, token.value);
+        const userToken = token.value || getTokenForRole('user');
+        const data = await api.sendChatMessage(selectedChatId.value, messageText, userToken);
         if (data.success) {
           messages.value.push(data.data.assistantMessage);
           await loadChats(); // Refresh chat list
