@@ -313,8 +313,26 @@ export function useAuth() {
               break;
             case 'user':
               userToken.value = storedToken;
+              // Ensure localStorage and store are in sync
+              if (userToken.value !== storedToken) {
+                console.warn('[Auth Store] Token mismatch detected, syncing...');
+                userToken.value = storedToken;
+              }
               break;
           }
+        }
+      }
+    } else {
+      // Sync specific role token
+      const storedToken = localStorage.getItem(`token_${role}`);
+      if (storedToken) {
+        switch (role) {
+          case 'user':
+            if (userToken.value !== storedToken) {
+              console.log('[Auth Store] Syncing user token from localStorage');
+              userToken.value = storedToken;
+            }
+            break;
         }
       }
     }
