@@ -10,6 +10,7 @@ const getRoleFromPath = (path) => {
 };
 
 // Helper to get token for a specific role
+// IMPORTANT: Never fallback to other roles - each role must use its own token
 const getTokenForRole = (role) => {
   if (!role) {
     // Try to get role from current path
@@ -18,14 +19,28 @@ const getTokenForRole = (role) => {
   }
   
   if (role) {
-    return localStorage.getItem(`token_${role}`);
+    const token = localStorage.getItem(`token_${role}`);
+    // Verify token role matches (decode and check)
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.role === role) {
+          return token;
+        } else {
+          console.warn(`[Token Mismatch] Token role (${payload.role}) doesn't match requested role (${role})`);
+          return null; // Don't return mismatched token
+        }
+      } catch (e) {
+        // If can't decode, return as-is (might be invalid token)
+        return token;
+      }
+    }
+    return null;
   }
   
-  // Fallback: try to find any token
-  return localStorage.getItem('token_super_admin') || 
-         localStorage.getItem('token_admin') || 
-         localStorage.getItem('token_client') || 
-         localStorage.getItem('token_user');
+  // NO FALLBACK - return null if role not specified
+  // This prevents using wrong tokens
+  return null;
 };
 
 class ApiService {
@@ -51,10 +66,29 @@ class ApiService {
         tokenSource = 'client (endpoint match)';
       } else if (endpoint.includes('/user/') || endpoint.includes('/auth/user/') || endpoint.includes('/users/') || 
                  endpoint.includes('/mobile/chat') || endpoint.includes('/mobile/voice') || endpoint.includes('/mobile/user/')) {
-        // CRITICAL: Mobile endpoints (chat, voice, user profile) MUST use user token
-        // These endpoints are ONLY for 'user' role
+        // CRITICAL: Mobile endpoints (chat, voice, user profile) MUST use user token ONLY
+        // These endpoints are ONLY for 'user' role - NEVER use other tokens
         token = getTokenForRole('user');
         tokenSource = 'user (mobile endpoint - user role required)';
+        
+        // Verify token is actually a user token
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            if (payload.role !== 'user') {
+              console.error('[API Error] Wrong token role for mobile endpoint:', {
+                endpoint,
+                tokenRole: payload.role,
+                requiredRole: 'user',
+                message: 'Rejecting non-user token for mobile endpoint'
+              });
+              token = null; // Reject wrong token
+              tokenSource = 'rejected (wrong role)';
+            }
+          } catch (e) {
+            console.warn('[API Warning] Could not verify token role:', e);
+          }
+        }
         
         // Warn if no user token found but other tokens exist
         if (!token) {
@@ -65,17 +99,26 @@ class ApiService {
           };
           const hasOtherTokens = Object.values(otherTokens).some(v => v);
           if (hasOtherTokens) {
-            console.warn('[API Warning]', {
+            console.error('[API Error]', {
               endpoint,
-              message: 'Mobile endpoint requires user token, but user is not logged in. Other roles are logged in.',
-              otherTokens
+              message: 'Mobile endpoint requires user token, but user is not logged in. Other roles are logged in. Please logout and login as a user.',
+              otherTokens,
+              availableTokens: Object.keys(otherTokens).filter(k => otherTokens[k])
             });
           }
         }
       } else {
-        // Try to get token from current route
-        token = getTokenForRole();
-        tokenSource = 'fallback (route detection)';
+        // For other endpoints, try to get token from current route
+        const currentPath = window.location.pathname;
+        const routeRole = getRoleFromPath(currentPath);
+        if (routeRole) {
+          token = getTokenForRole(routeRole);
+          tokenSource = `route-based (${routeRole})`;
+        } else {
+          // No role detected, no token
+          token = null;
+          tokenSource = 'none (no role detected)';
+        }
       }
     }
     

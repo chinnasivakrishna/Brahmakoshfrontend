@@ -19,30 +19,52 @@ export default {
 
     const loadChats = async () => {
       try {
-        // Get token explicitly for user role
-        const userToken = token.value || getTokenForRole('user');
+        // CRITICAL: Mobile endpoints MUST use user token ONLY
+        // Get token explicitly for user role - never use other roles
+        const userToken = getTokenForRole('user') || localStorage.getItem('token_user');
+        
+        // Verify token is actually a user token
+        if (userToken) {
+          try {
+            const payload = JSON.parse(atob(userToken.split('.')[1]));
+            if (payload.role !== 'user') {
+              console.error('[MobileChatPage] Wrong token role detected:', {
+                tokenRole: payload.role,
+                requiredRole: 'user',
+                message: 'Rejecting non-user token'
+              });
+              throw new Error('Invalid token. Please login as a user.');
+            }
+          } catch (e) {
+            if (e.message.includes('Invalid token')) throw e;
+            console.warn('[MobileChatPage] Could not verify token:', e);
+          }
+        }
         
         // Debug logging
         console.log('[MobileChatPage] Loading chats:', {
-          hasTokenFromStore: !!token.value,
-          hasTokenFromRole: !!getTokenForRole('user'),
           hasUserToken: !!userToken,
           tokenLength: userToken ? userToken.length : 0,
           tokenPreview: userToken ? userToken.substring(0, 20) + '...' : 'none',
-          tokenFromStore: token.value,
-          tokenFromRole: getTokenForRole('user'),
           localStorageToken: localStorage.getItem('token_user'),
-          allLocalStorageTokens: {
-            user: localStorage.getItem('token_user'),
-            admin: localStorage.getItem('token_admin'),
-            client: localStorage.getItem('token_client'),
-            superAdmin: localStorage.getItem('token_super_admin')
+          otherTokensPresent: {
+            admin: !!localStorage.getItem('token_admin'),
+            client: !!localStorage.getItem('token_client'),
+            superAdmin: !!localStorage.getItem('token_super_admin')
           }
         });
         
         if (!userToken) {
-          console.error('[MobileChatPage] No token available for chat request');
-          throw new Error('Authentication required. Please login again.');
+          console.error('[MobileChatPage] No user token available');
+          const otherRoles = [];
+          if (localStorage.getItem('token_admin')) otherRoles.push('admin');
+          if (localStorage.getItem('token_client')) otherRoles.push('client');
+          if (localStorage.getItem('token_super_admin')) otherRoles.push('super_admin');
+          
+          if (otherRoles.length > 0) {
+            throw new Error(`You are logged in as ${otherRoles.join('/')}, but this feature requires user login. Please logout and login as a user.`);
+          }
+          throw new Error('Authentication required. Please login as a user.');
         }
         
         const data = await api.getChats(userToken);
@@ -52,9 +74,7 @@ export default {
       } catch (error) {
         console.error('[MobileChatPage] Failed to load chats:', {
           error: error.message,
-          hasToken: !!token.value,
-          tokenFromStore: token.value,
-          localStorageToken: localStorage.getItem('token_user')
+          hasUserToken: !!localStorage.getItem('token_user')
         });
       } finally {
         chatLoading.value = false;
@@ -63,7 +83,8 @@ export default {
 
     const loadChat = async (chatId) => {
       try {
-        const userToken = token.value || getTokenForRole('user');
+        const userToken = getTokenForRole('user') || localStorage.getItem('token_user');
+        if (!userToken) throw new Error('User token required');
         const data = await api.getChat(chatId, userToken);
         if (data.success) {
           messages.value = data.data.messages || [];
@@ -75,7 +96,8 @@ export default {
 
     const handleNewChat = async () => {
       try {
-        const userToken = token.value || getTokenForRole('user');
+        const userToken = getTokenForRole('user') || localStorage.getItem('token_user');
+        if (!userToken) throw new Error('User token required');
         const data = await api.createChat(userToken);
         if (data.success) {
           selectedChatId.value = data.data.chatId;
@@ -102,7 +124,8 @@ export default {
       loading.value = true;
 
       try {
-        const userToken = token.value || getTokenForRole('user');
+        const userToken = getTokenForRole('user') || localStorage.getItem('token_user');
+        if (!userToken) throw new Error('User token required');
         const data = await api.sendChatMessage(selectedChatId.value, messageText, userToken);
         if (data.success) {
           messages.value.push(data.data.assistantMessage);

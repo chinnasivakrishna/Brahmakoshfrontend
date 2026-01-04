@@ -50,35 +50,51 @@ export function useAuth() {
   };
 
   // Get current user and token based on role
+  // IMPORTANT: Never mix roles - each role must use its own token
   const getCurrentAuth = (role = null) => {
     const currentRole = role || getCurrentRole();
     
     switch (currentRole) {
       case 'super_admin':
-        return { user: superAdminUser, token: superAdminToken };
+        return { user: superAdminUser, token: superAdminToken, role: 'super_admin' };
       case 'admin':
-        return { user: adminUser, token: adminToken };
+        return { user: adminUser, token: adminToken, role: 'admin' };
       case 'client':
-        return { user: clientUser, token: clientToken };
+        return { user: clientUser, token: clientToken, role: 'client' };
       case 'user':
-        return { user: userUser, token: userToken };
+        return { user: userUser, token: userToken, role: 'user' };
       default:
-        // Try to find any authenticated role
-        if (superAdminToken.value) return { user: superAdminUser, token: superAdminToken, role: 'super_admin' };
-        if (adminToken.value) return { user: adminUser, token: adminToken, role: 'admin' };
-        if (clientToken.value) return { user: clientUser, token: clientToken, role: 'client' };
-        if (userToken.value) return { user: userUser, token: userToken, role: 'user' };
-        return { user: ref(null), token: ref(null) };
+        // For mobile routes (/mobile/*), always return user auth
+        const currentPath = router.currentRoute.value?.path || window.location.pathname;
+        if (currentPath.includes('/mobile/')) {
+          return { user: userUser, token: userToken, role: 'user' };
+        }
+        // For other routes without specific role, return null (don't mix roles)
+        return { user: ref(null), token: ref(null), role: null };
     }
   };
 
   // Computed properties for current role
   const currentAuth = computed(() => getCurrentAuth());
   const user = computed(() => currentAuth.value.user?.value);
-  const token = computed(() => currentAuth.value.token?.value);
+  const token = computed(() => {
+    const auth = currentAuth.value;
+    // For mobile routes, always use user token
+    const currentPath = router.currentRoute.value?.path || window.location.pathname;
+    if (currentPath.includes('/mobile/')) {
+      return userToken.value;
+    }
+    // For other routes, use role-specific token
+    return auth.token?.value;
+  });
   const userRole = computed(() => {
     const role = getCurrentRole();
     if (role) return role;
+    // For mobile routes, default to user
+    const currentPath = router.currentRoute.value?.path || window.location.pathname;
+    if (currentPath.includes('/mobile/')) {
+      return 'user';
+    }
     return user.value?.role || currentAuth.value.role;
   });
   
