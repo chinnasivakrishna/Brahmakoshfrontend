@@ -65,12 +65,9 @@ export default {
             <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#6b7280' }}>
               Don't have an account?{' '}
               <RouterLink to="/mobile/user/register" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 'bold' }}>
-                Register with Mobile (OTP)
+                Register
               </RouterLink>
-              {' or '}
-              <RouterLink to="/user/register" style={{ color: '#6366f1', textDecoration: 'none' }}>
-                Standard Register
-              </RouterLink>
+              
             </p>
           </form>
         </div>

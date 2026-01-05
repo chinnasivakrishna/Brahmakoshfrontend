@@ -423,6 +423,16 @@ class ApiService {
     return this.request('/super-admin/pending-approvals');
   }
 
+  async getUsers() {
+    return this.request('/super-admin/users');
+  }
+
+  async deleteUser(userId) {
+    return this.request(`/super-admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async approveLogin(type, userId) {
     return this.request(`/super-admin/approve-login/${type}/${userId}`, {
       method: 'POST',

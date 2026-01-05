@@ -108,6 +108,11 @@ const routes = [
         path: 'pending-approvals',
         name: 'SuperAdminPendingApprovals',
         component: () => import('../views/super-admin/PendingApprovals.jsx')
+      },
+      {
+        path: 'users',
+        name: 'SuperAdminUsers',
+        component: () => import('../views/super-admin/Users.jsx')
       }
     ]
   },

@@ -18,6 +18,7 @@ export default {
     const superAdminMenu = [
       { path: '/super-admin/overview', label: 'Overview', icon: '📊' },
       { path: '/super-admin/admins', label: 'Admins', icon: '👥' },
+      { path: '/super-admin/users', label: 'Users', icon: '👤' },
       { path: '/super-admin/pending-approvals', label: 'Pending Approvals', icon: '⏳' }
     ];
 
