@@ -542,6 +542,43 @@ class ApiService {
       },
     });
   }
+
+  // Real-time Agent APIs
+  async createRealtimeAgentRoom(token) {
+    return this.request('/mobile/realtime-agent/create-room', {
+      method: 'POST',
+      token,
+    });
+  }
+
+  // Password Reset APIs
+  async forgotPassword(email) {
+    return this.request('/auth/user/forgot-password', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  async verifyResetOTP(email, otp) {
+    return this.request('/auth/user/verify-reset-otp', {
+      method: 'POST',
+      body: { email, otp },
+    });
+  }
+
+  async resetPassword(email, resetToken, newPassword) {
+    return this.request('/auth/user/reset-password', {
+      method: 'POST',
+      body: { email, resetToken, newPassword },
+    });
+  }
+
+  async resendResetOTP(email) {
+    return this.request('/auth/user/resend-reset-otp', {
+      method: 'POST',
+      body: { email },
+    });
+  }
 }
 
 const api = new ApiService();

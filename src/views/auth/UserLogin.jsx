@@ -62,12 +62,16 @@ export default {
             <button type="submit" disabled={loading.value} class="btn btn-primary w-100">
               {loading.value ? 'Logging in...' : 'Login'}
             </button>
-            <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#6b7280' }}>
+            <p style={{ textAlign: 'center', marginTop: '1rem', marginBottom: '0.5rem' }}>
+              <RouterLink to="/user/forgot-password" style={{ color: '#6366f1', textDecoration: 'none', fontSize: '0.9rem' }}>
+                Forgot Password?
+              </RouterLink>
+            </p>
+            <p style={{ textAlign: 'center', marginTop: '1rem', color: '#6b7280' }}>
               Don't have an account?{' '}
               <RouterLink to="/mobile/user/register" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 'bold' }}>
                 Register
               </RouterLink>
-              
             </p>
           </form>
         </div>

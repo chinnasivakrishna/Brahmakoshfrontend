@@ -12,6 +12,7 @@ export default {
       const path = router.currentRoute.value.path;
       if (path.includes('/chat')) return 'chat';
       if (path.includes('/voice')) return 'voice';
+      if (path.includes('/realtime-agent')) return 'realtime-agent';
       return 'home';
     });
 
@@ -22,6 +23,8 @@ export default {
         router.push('/mobile/user/chat');
       } else if (page === 'voice') {
         router.push('/mobile/user/voice');
+      } else if (page === 'realtime-agent') {
+        router.push('/mobile/user/realtime-agent');
       }
     };
 
@@ -52,7 +55,8 @@ export default {
             {[
               { id: 'home', label: 'Home', icon: '🏠' },
               { id: 'chat', label: 'Chat', icon: '💬' },
-              { id: 'voice', label: 'Voice', icon: '🎤' }
+              { id: 'voice', label: 'Voice', icon: '🎤' },
+              { id: 'realtime-agent', label: 'Real Time Agent', icon: '🤖' }
             ].map(item => (
               <button
                 key={item.id}

@@ -27,6 +27,24 @@ const routes = [
     component: () => import('../views/auth/UserLogin.jsx'),
     meta: { requiresGuest: true }
   },
+  {
+    path: '/user/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import('../views/auth/ForgotPassword.jsx'),
+    meta: { requiresGuest: true }
+  },
+  {
+    path: '/user/verify-reset-otp',
+    name: 'VerifyResetOTP',
+    component: () => import('../views/auth/VerifyResetOTP.jsx'),
+    meta: { requiresGuest: true }
+  },
+  {
+    path: '/user/reset-password',
+    name: 'ResetPassword',
+    component: () => import('../views/auth/ResetPassword.jsx'),
+    meta: { requiresGuest: true }
+  },
   // Auth Routes - Separate register pages
   {
     path: '/client/register',
@@ -84,6 +102,11 @@ const routes = [
         path: 'voice',
         name: 'MobileVoicePage',
         component: () => import('../views/mobile/MobileVoicePage.jsx')
+      },
+      {
+        path: 'realtime-agent',
+        name: 'RealTimeAgent',
+        component: () => import('../views/mobile/RealTimeAgent.jsx')
       }
     ]
   },
