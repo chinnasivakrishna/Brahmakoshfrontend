@@ -11,7 +11,9 @@ export default {
     const transcript = ref('');
     const response = ref('');
     const isProcessing = ref(false);
+    const isPlaybackActive = ref(false);
     const mediaRecorderRef = ref(null);
+    const mediaStreamRef = ref(null);
     const audioChunksRef = ref([]);
     const isSessionActive = ref(false);
     const silenceTimeoutRef = ref(null);
@@ -19,6 +21,9 @@ export default {
     const analyserRef = ref(null);
     const silenceDetectionIntervalRef = ref(null);
     const lastSoundTimeRef = ref(Date.now());
+    const segmentHasSpeechRef = ref(false);
+    let ttsUtteranceRef = null;
+    const isPlayingResponse = ref(false);
     const SILENCE_THRESHOLD = 2000; // 2 seconds of silence
     const AUDIO_THRESHOLD = 0.01; // Audio level threshold for detecting speech
 
@@ -79,6 +84,7 @@ export default {
           } 
         });
         console.log('[Voice] Microphone access granted');
+        mediaStreamRef.value = stream;
 
         // Set up audio context for silence detection
         audioContextRef.value = new (window.AudioContext || window.webkitAudioContext)();
@@ -87,11 +93,13 @@ export default {
         analyserRef.value.fftSize = 2048;
         source.connect(analyserRef.value);
 
-        // Try different MIME types in order of preference
+        // Try different MIME types in order of preference (prefer WAV/PCM for ffmpeg friendliness)
         const mimeTypes = [
+          'audio/wav',
+          'audio/ogg;codecs=opus',
+          'audio/ogg',
           'audio/webm;codecs=opus',
           'audio/webm',
-          'audio/ogg;codecs=opus',
           'audio/mp4',
           'audio/mpeg'
         ];
@@ -116,8 +124,11 @@ export default {
 
         audioChunksRef.value = [];
         lastSoundTimeRef.value = Date.now();
+        segmentHasSpeechRef.value = false;
         
         mediaRecorder.ondataavailable = (e) => {
+          // Drop chunks while playback is active to avoid re-recording TTS/response audio
+          if (isPlaybackActive.value) return;
           if (e.data.size > 0 && isSessionActive.value) {
             console.log('[Voice] Audio chunk received:', { size: e.data.size, type: e.data.type });
             audioChunksRef.value.push(e.data);
@@ -160,7 +171,7 @@ export default {
       console.log('[Voice] Starting silence detection...');
       
       silenceDetectionIntervalRef.value = setInterval(() => {
-        if (!analyserRef.value || !isSessionActive.value || isProcessing.value) return;
+        if (!analyserRef.value || !isSessionActive.value || isProcessing.value || isPlaybackActive.value) return;
 
         const bufferLength = analyserRef.value.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
@@ -177,6 +188,8 @@ export default {
         // Check if there's sound
         if (rms > AUDIO_THRESHOLD) {
           lastSoundTimeRef.value = Date.now();
+          // Mark that this segment has speech above threshold
+          segmentHasSpeechRef.value = true;
         }
 
         // Check for silence
@@ -192,17 +205,38 @@ export default {
       if (isProcessing.value || audioChunksRef.value.length === 0) return;
       if (!mediaRecorderRef.value || mediaRecorderRef.value.state === 'inactive') return;
 
+      // If we never detected speech in this segment, skip sending to Deepgram
+      if (!segmentHasSpeechRef.value) {
+        console.log('[Voice] Segment had no detected speech, skipping processing');
+        audioChunksRef.value = [];
+        lastSoundTimeRef.value = Date.now();
+        segmentHasSpeechRef.value = false;
+        return;
+      }
+
       isProcessing.value = true;
-      console.log('[Voice] Stopping MediaRecorder to finalize audio segment...');
+      console.log('[Voice] Stopping MediaRecorder to finalize audio segment with speech...');
       
       // Store the stream before stopping
-      const currentStream = mediaRecorderRef.value.stream;
+      const currentStream = mediaRecorderRef.value.stream || mediaStreamRef.value;
       
       // Stop the current recorder to finalize the audio with proper headers
+      const stopPromise = new Promise((resolveStop) => {
+        if (mediaRecorderRef.value) {
+          const handler = () => {
+            mediaRecorderRef.value.removeEventListener('stop', handler);
+            resolveStop();
+          };
+          mediaRecorderRef.value.addEventListener('stop', handler);
+        } else {
+          resolveStop();
+        }
+      });
       mediaRecorderRef.value.stop();
       
-      // Wait a bit for the onstop event to fire and finalize
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for recorder stop and ensure all chunks are flushed (longer delay for reliability)
+      await stopPromise;
+      await new Promise(resolve => setTimeout(resolve, 500)); // Increased from 200ms to 500ms
       
       console.log('[Voice] Processing audio segment, total chunks:', audioChunksRef.value.length);
       const chunksToProcess = [...audioChunksRef.value];
@@ -212,22 +246,25 @@ export default {
       await processAudio(chunksToProcess);
       
       // Restart recording if session is still active
-      if (isSessionActive.value) {
+      if (isSessionActive.value && currentStream) {
         console.log('[Voice] Restarting MediaRecorder for next segment...');
         restartMediaRecorder(currentStream);
       }
       
       lastSoundTimeRef.value = Date.now(); // Reset silence timer
+      segmentHasSpeechRef.value = false;
       isProcessing.value = false;
     };
 
     const restartMediaRecorder = (stream) => {
       try {
-        // Try different MIME types
+        // Try different MIME types (prefer WAV/PCM for ffmpeg friendliness)
         const mimeTypes = [
+          'audio/wav',
+          'audio/ogg;codecs=opus',
+          'audio/ogg',
           'audio/webm;codecs=opus',
           'audio/webm',
-          'audio/ogg;codecs=opus',
           'audio/mp4'
         ];
         
@@ -294,8 +331,46 @@ export default {
         });
       }
 
+      // Stop any ongoing browser TTS
+      if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+
       audioChunksRef.value = [];
       console.log('[Voice] Continuous session stopped');
+    };
+
+    const speakWithBrowserTTS = (text) => {
+      if (!text || !window.speechSynthesis) return;
+
+      try {
+        // Stop any current speech
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        ttsUtteranceRef = utterance;
+        isPlaybackActive.value = true;
+
+        utterance.onstart = () => console.log('[Voice] Browser TTS started');
+        utterance.onend = () => {
+          console.log('[Voice] Browser TTS ended');
+          isPlaybackActive.value = false;
+        };
+        utterance.onerror = (e) => {
+          console.error('[Voice] Browser TTS error:', e.error);
+          isPlaybackActive.value = false;
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error('[Voice] Browser TTS exception:', err);
+        isPlaybackActive.value = false;
+      }
     };
 
 
@@ -345,6 +420,21 @@ export default {
         const audioBlob = new Blob(audioChunks, { type: audioType });
         console.log('[Voice] Audio blob created:', { size: audioBlob.size, type: audioBlob.type });
 
+        // Guard: if the blob is too small, skip sending to backend to avoid invalid format errors
+        if (!audioBlob.size || audioBlob.size < 8000) {
+          console.warn('[Voice] Audio blob too small, skipping send');
+          const fallbackMessage = "I can't hear you clearly. Please repeat.";
+          speakWithBrowserTTS(fallbackMessage);
+          isProcessing.value = false;
+          return;
+        }
+
+        // Note: We skip strict audio validation here because:
+        // 1. WebM/Opus chunks from MediaRecorder may not decode immediately in browser
+        // 2. Backend has robust error handling with ffmpeg conversion
+        // 3. Backend returns graceful fallback messages for corrupted audio
+        // Let backend handle validation - it's more reliable for WebM/Opus streams
+
         console.log('[Voice] Converting to base64...');
         const base64Audio = await blobToBase64(audioBlob);
         console.log('[Voice] Base64 conversion complete:', { length: base64Audio.length });
@@ -361,9 +451,18 @@ export default {
           success: data.success,
           hasTranscription: !!data.data?.transcribedText,
           hasResponse: !!data.data?.aiResponse,
-          hasAudio: !!data.data?.audioResponse
+          hasAudio: !!data.data?.audioResponse,
+          hasFallbackVoice: !!data.data?.fallbackVoiceText
         });
         
+        // Handle fallback voice from backend without treating as error
+        if (data.data?.fallbackVoiceText) {
+          speakWithBrowserTTS(data.data.fallbackVoiceText);
+          // Stop session to avoid repeated failing loops
+          stopContinuousSession();
+          return;
+        }
+
         if (data.success) {
           transcript.value = data.data.transcribedText || '';
           response.value = data.data.aiResponse || '';
@@ -371,19 +470,27 @@ export default {
           console.log('[Voice] Transcription:', transcript.value);
           console.log('[Voice] AI Response:', response.value);
 
-          // Play audio response if available
+          // Play audio response if available; fallback to browser TTS if missing
           if (data.data.audioResponse) {
-            console.log('[Voice] Playing audio response...');
+            console.log('[Voice] Playing audio response (Deepgram TTS)...');
+            isPlaybackActive.value = true;
             try {
-              const audio = new Audio(`data:audio/mp3;base64,${data.data.audioResponse}`);
+              const format = data.data.audioFormat || 'wav';
+              const mimeType = format === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+              const audio = new Audio(`data:${mimeType};base64,${data.data.audioResponse}`);
               
-              // Wait for audio to finish playing, then auto-start next recording
               audio.onended = () => {
                 console.log('[Voice] Audio playback ended');
+                isPlaybackActive.value = false;
               };
               
               audio.onerror = (err) => {
                 console.error('[Voice] Audio playback error:', err);
+                isPlaybackActive.value = false;
+                // Fallback to Web Speech TTS if playback fails
+                if (response.value) {
+                  speakWithBrowserTTS(response.value);
+                }
               };
 
               audio.onloadstart = () => {
@@ -396,12 +503,25 @@ export default {
               
               await audio.play().catch(err => {
                 console.error('[Voice] Failed to play audio:', err);
+                isPlaybackActive.value = false;
+                if (response.value) {
+                  speakWithBrowserTTS(response.value);
+                }
               });
             } catch (audioError) {
               console.error('[Voice] Audio playback exception:', audioError);
+              isPlaybackActive.value = false;
+              if (response.value) {
+                speakWithBrowserTTS(response.value);
+              }
             }
           } else {
-            console.log('[Voice] No audio response received');
+            console.log('[Voice] No audio response received; using browser TTS fallback');
+            if (response.value) {
+              isPlaybackActive.value = true;
+              speakWithBrowserTTS(response.value);
+              // Browser TTS will set flag false on end inside speakWithBrowserTTS
+            }
           }
         } else {
           console.error('[Voice] API returned unsuccessful response:', data);
@@ -414,7 +534,16 @@ export default {
           response: error.response?.data,
           status: error.response?.status
         });
-        alert(`Failed to process audio: ${error.message || 'Unknown error'}. Please try again.`);
+
+        // Friendly fallback voice if audio is invalid or any error occurs
+        const fallbackMessage = "I can't hear you clearly. Please repeat.";
+        speakWithBrowserTTS(fallbackMessage);
+
+        // Do not alert the user with a blocking dialog
+        // Reset state for next segment
+        segmentHasSpeechRef.value = false;
+        audioChunksRef.value = [];
+        lastSoundTimeRef.value = Date.now();
       } finally {
         isProcessing.value = false;
         if (!chunks) {
