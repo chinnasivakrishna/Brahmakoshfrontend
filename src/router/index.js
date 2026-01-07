@@ -94,6 +94,11 @@ const routes = [
         component: () => import('../views/mobile/MobileUserDashboard.jsx')
       },
       {
+        path: 'profile',
+        name: 'MobileUserProfile',
+        component: () => import('../views/mobile/MobileUserProfile.jsx')
+      },
+      {
         path: 'chat',
         name: 'MobileChatPage',
         component: () => import('../views/mobile/MobileChatPage.jsx')
@@ -123,6 +128,11 @@ const routes = [
         component: () => import('../views/super-admin/Overview.jsx')
       },
       {
+        path: 'profile',
+        name: 'SuperAdminProfile',
+        component: () => import('../views/super-admin/Profile.jsx')
+      },
+      {
         path: 'admins',
         name: 'SuperAdminAdmins',
         component: () => import('../views/super-admin/Admins.jsx')
@@ -150,6 +160,11 @@ const routes = [
         path: 'overview',
         name: 'AdminOverview',
         component: () => import('../views/admin/Overview.jsx')
+      },
+      {
+        path: 'profile',
+        name: 'AdminProfile',
+        component: () => import('../views/admin/Profile.jsx')
       },
       {
         path: 'clients',
@@ -211,6 +226,11 @@ const routes = [
         component: () => import('../views/client/Overview.jsx')
       },
       {
+        path: 'profile',
+        name: 'ClientProfile',
+        component: () => import('../views/client/Profile.jsx')
+      },
+      {
         path: 'avatar',
         name: 'ClientAvatar',
         component: () => import('../views/client/Avatar.jsx')
@@ -254,6 +274,29 @@ const routes = [
         path: 'settings',
         name: 'ClientSettings',
         component: () => import('../views/client/Settings.jsx')
+      }
+    ]
+  },
+  // User web frontend routes
+  {
+    path: '/user',
+    component: () => import('../layouts/DashboardLayout.jsx'),
+    meta: { requiresAuth: true, requiresRole: 'user' },
+    redirect: '/user/overview',
+    children: [
+      {
+        path: '',
+        redirect: 'overview'
+      },
+      {
+        path: 'overview',
+        name: 'UserOverview',
+        component: () => import('../views/user/Overview.jsx')
+      },
+      {
+        path: 'profile',
+        name: 'UserProfile',
+        component: () => import('../views/user/Profile.jsx')
       }
     ]
   },
@@ -351,7 +394,13 @@ router.beforeEach(async (to, from, next) => {
     } else if (targetRole === 'client') {
       next('/client/overview');
     } else if (targetRole === 'user') {
-      next('/mobile/user/dashboard'); // Redirect mobile users to mobile dashboard
+      // Check if user is accessing web frontend or mobile
+      // If coming from web routes, redirect to web dashboard
+      if (from.path.startsWith('/user') && !from.path.startsWith('/mobile')) {
+        next('/user/overview');
+      } else {
+        next('/mobile/user/dashboard'); // Default to mobile dashboard
+      }
     } else {
       next('/dashboard');
     }

@@ -3,17 +3,18 @@ import { RouterLink } from 'vue-router';
 import api from '../../services/api.js';
 
 export default {
-  name: 'AdminOverview',
+  name: 'UserOverview',
   setup() {
     const stats = ref({
-      totalClients: 0,
-      totalUsers: 0
+      totalChats: 0,
+      totalVoiceCalls: 0
     });
 
     onMounted(async () => {
       try {
-        const response = await api.getAdminDashboard();
-        stats.value = response.data;
+        // You can add a user dashboard API endpoint later
+        // const response = await api.getUserDashboard();
+        // stats.value = response.data;
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       }
@@ -23,8 +24,8 @@ export default {
       <div class="card">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="card-title mb-0">Admin Overview</h1>
-            <RouterLink to="/admin/profile" class="btn btn-primary">
+            <h1 class="card-title mb-0">User Dashboard</h1>
+            <RouterLink to="/user/profile" class="btn btn-primary">
               View Profile
             </RouterLink>
           </div>
@@ -32,16 +33,8 @@ export default {
             <div class="col-md-6">
               <div class="card bg-light">
                 <div class="card-body">
-                  <h5 class="card-subtitle mb-2 text-muted">Total Clients</h5>
-                  <h2 class="card-title">{stats.value.totalClients}</h2>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="card bg-light">
-                <div class="card-body">
-                  <h5 class="card-subtitle mb-2 text-muted">Total Users</h5>
-                  <h2 class="card-title">{stats.value.totalUsers}</h2>
+                  <h5 class="card-subtitle mb-2 text-muted">Welcome</h5>
+                  <p class="card-text">Manage your profile and access services from here.</p>
                 </div>
               </div>
             </div>
@@ -51,3 +44,4 @@ export default {
     );
   }
 };
+

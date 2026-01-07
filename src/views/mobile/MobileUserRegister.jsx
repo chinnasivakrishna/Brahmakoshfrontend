@@ -30,6 +30,7 @@ export default {
     const imageFile = ref(null);
     const imageFileName = ref('');
     const imageContentType = ref('');
+    const userToken = ref(null); // token returned after completing profile (step 3)
     
     const loading = ref(false);
     const error = ref('');
@@ -130,7 +131,7 @@ export default {
       }
     };
 
-    // Step 3: Complete Profile
+    // Step 3: Complete Profile (without image upload)
     const handleStep3 = async (e) => {
       e.preventDefault();
       loading.value = true;
@@ -140,14 +141,15 @@ export default {
         const response = await api.mobileUserRegisterStep3(
           email.value,
           profile.value,
-          imageFileName.value,
-          imageContentType.value
+          null,
+          null
         );
         
         if (response.success) {
-          alert('Registration completed successfully! You can now login immediately.');
-          // Redirect to login page
-          router.push('/user/login');
+          // Save token from backend for image upload step
+          userToken.value = response.data?.token || null;
+          step.value = 4;
+          alert('Profile completed successfully! Now upload your profile image.');
         }
       } catch (err) {
         error.value = err.message || 'Failed to complete registration';
@@ -156,7 +158,7 @@ export default {
       }
     };
 
-    // Handle image upload
+    // Handle image selection (for step 4)
     const handleImageChange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -166,9 +168,38 @@ export default {
       }
     };
 
+    // Step 4: Upload Profile Image
+    const handleStep4 = async (e) => {
+      e.preventDefault();
+      loading.value = true;
+      error.value = '';
+
+      try {
+        if (!imageFile.value) {
+          throw new Error('Please select an image file');
+        }
+        if (!userToken.value) {
+          throw new Error('Missing user token. Please complete profile again.');
+        }
+
+        const formData = new FormData();
+        formData.append('image', imageFile.value);
+
+        const response = await api.mobileUserRegisterStep4UploadImage(formData, userToken.value);
+        if (response.success) {
+          alert('Profile image uploaded successfully! You can now login.');
+          router.push('/user/login');
+        }
+      } catch (err) {
+        error.value = err.message || 'Failed to upload profile image';
+      } finally {
+        loading.value = false;
+      }
+    };
+
     return () => (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#f5f5f5' }}>
-        <div style={{ background: 'white', borderRadius: '12px', padding: '3rem', width: '100%', maxWidth: '600px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' }}>
+        <div style={{ background: 'white', borderRadius: '12px', padding: '3rem', width: '100%', maxWidth: '650px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' }}>
           <h1 style={{ textAlign: 'center', marginBottom: '2rem', color: '#1f2937', fontSize: '2rem' }}>
             Mobile User Registration
           </h1>
@@ -183,6 +214,9 @@ export default {
             </div>
             <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: step.value >= 3 ? '#3498db' : '#e0e0e0', color: step.value >= 3 ? 'white' : '#666', borderRadius: '8px', margin: '0 5px' }}>
               Step 3: Profile
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: step.value >= 4 ? '#3498db' : '#e0e0e0', color: step.value >= 4 ? 'white' : '#666', borderRadius: '8px', margin: '0 5px' }}>
+              Step 4: Image
             </div>
           </div>
 
@@ -355,17 +389,27 @@ export default {
                   placeholder="Enter gowthra"
                 />
               </div>
+              <button type="submit" disabled={loading.value} class="btn btn-primary w-100">
+                {loading.value ? 'Completing Registration...' : 'Complete Registration'}
+              </button>
+            </form>
+          )}
+
+          {/* Step 4: Profile Image Upload */}
+          {step.value === 4 && (
+            <form onSubmit={handleStep4}>
               <div class="mb-3">
-                <label class="form-label">Profile Image (Optional)</label>
+                <label class="form-label">Profile Image</label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
                   class="form-control"
+                  required
                 />
               </div>
               <button type="submit" disabled={loading.value} class="btn btn-primary w-100">
-                {loading.value ? 'Completing Registration...' : 'Complete Registration'}
+                {loading.value ? 'Uploading...' : 'Upload Image'}
               </button>
             </form>
           )}

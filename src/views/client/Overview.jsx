@@ -1,4 +1,5 @@
 import { ref, onMounted } from 'vue';
+import { RouterLink } from 'vue-router';
 import api from '../../services/api.js';
 
 export default {
@@ -20,7 +21,12 @@ export default {
     return () => (
       <div class="card">
         <div class="card-body">
-          <h1 class="card-title mb-4">Client Overview</h1>
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="card-title mb-0">Client Overview</h1>
+            <RouterLink to="/client/profile" class="btn btn-primary">
+              View Profile
+            </RouterLink>
+          </div>
           <div class="row g-3">
             <div class="col-md-6">
               <div class="card bg-light">

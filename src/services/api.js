@@ -579,6 +579,60 @@ class ApiService {
       body: { email },
     });
   }
+
+  // Mobile User Registration with Image
+  async registerUserWithImage(formData) {
+    // formData should be FormData object with fields: email, password, name, dob, timeOfBirth, placeOfBirth, gowthra, profession, image (file)
+    return fetch(`${this.baseURL}/mobile/user/register-with-image`, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+    }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+      return data;
+    });
+  }
+
+  // Update User Profile with Image
+  async updateUserProfileWithImage(formData, token) {
+    // formData should be FormData object with optional fields: email, password, profile (JSON string), image (file)
+    return fetch(`${this.baseURL}/mobile/user/profile`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+      },
+      body: formData,
+    }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Profile update failed');
+      }
+      return data;
+    });
+  }
+
+  // Mobile User Registration - Step 4: Upload Profile Image
+  async mobileUserRegisterStep4UploadImage(formData, token) {
+    // formData should have field: image (file)
+    return fetch(`${this.baseURL}/mobile/user/profile/image`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // No Content-Type; browser sets it for multipart/form-data
+      },
+      body: formData,
+    }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Profile image upload failed');
+      }
+      return data;
+    });
+  }
 }
 
 const api = new ApiService();
