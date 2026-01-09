@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import api from '../../services/api.js';
 
@@ -171,6 +171,76 @@ export default {
       }
     };
 
+    onMounted(() => {
+      // Only load once
+      if (!window.google?.accounts?.id) {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+        script.onload = () => {
+          setTimeout(initGoogle, 100);
+        };
+      } else {
+        setTimeout(initGoogle, 100);
+      }
+    });
+ 
+    function initGoogle() {
+      if (!window.google || !window.google.accounts) {
+        console.log('Google SDK not loaded yet');
+        return;
+      }
+      
+      try {
+        window.google.accounts.id.initialize({
+          client_id: '449350149768-a1a1qn8siakh4hq7tejj60ri81c6hh85.apps.googleusercontent.com',
+          callback: handleGoogleCredential,
+          ux_mode: 'popup', // Use popup mode to avoid COOP issues
+          auto_select: false,
+        });
+        
+        const buttonDiv = document.getElementById('g_id_signup');
+        if (buttonDiv) {
+          window.google.accounts.id.renderButton(
+            buttonDiv,
+            { 
+              theme: 'outline', 
+              size: 'large', 
+              width: 340,
+              type: 'standard',
+              text: 'signup_with',
+              shape: 'rectangular'
+            }
+          );
+          console.log('Google button rendered successfully');
+        } else {
+          console.error('Google button container not found');
+        }
+      } catch (error) {
+        console.error('Error initializing Google Sign-In:', error);
+      }
+    }
+ 
+    async function handleGoogleCredential(response) {
+      loading.value = true;
+      error.value = '';
+      try {
+        const { data } = await api.post('/api/auth/user/google', {
+          idToken: response.credential,
+        });
+        localStorage.setItem('token_user', data.data.token);
+        alert('Google sign-up successful! Redirecting to dashboard...');
+        router.push('/mobile/user/dashboard');
+      } catch (e) {
+        error.value = e.response?.data?.message || 'Google sign-up failed';
+        console.error('Google sign-up error:', e);
+      } finally {
+        loading.value = false;
+      }
+    }
+
     return () => (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#f5f5f5' }}>
         <div style={{ background: 'white', borderRadius: '12px', padding: '3rem', width: '100%', maxWidth: '600px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' }}>
@@ -199,64 +269,74 @@ export default {
 
           {/* Step 1: Email OTP */}
           {step.value === 1 && (
-            <form onSubmit={emailOtpSent.value ? handleStep1Verify : handleStep1}>
-              <div class="mb-3">
-                <label class="form-label">Email</label>
-                <input
-                  value={email.value}
-                  onInput={(e) => email.value = e.target.value}
-                  type="email"
-                  class="form-control"
-                  required
-                  disabled={emailOtpSent.value}
-                  placeholder="Enter email"
-                />
-              </div>
-              {!emailOtpSent.value && (
+            <>
+              <form onSubmit={emailOtpSent.value ? handleStep1Verify : handleStep1}>
                 <div class="mb-3">
-                  <label class="form-label">Password</label>
+                  <label class="form-label">Email</label>
                   <input
-                    value={password.value}
-                    onInput={(e) => password.value = e.target.value}
-                    type="password"
+                    value={email.value}
+                    onInput={(e) => email.value = e.target.value}
+                    type="email"
                     class="form-control"
                     required
-                    placeholder="Enter password"
+                    disabled={emailOtpSent.value}
+                    placeholder="Enter email"
                   />
                 </div>
-              )}
-              {emailOtpSent.value && (
-                <>
+                {!emailOtpSent.value && (
                   <div class="mb-3">
-                    <label class="form-label">Enter OTP</label>
+                    <label class="form-label">Password</label>
                     <input
-                      value={emailOtp.value}
-                      onInput={(e) => emailOtp.value = e.target.value}
-                      type="text"
+                      value={password.value}
+                      onInput={(e) => password.value = e.target.value}
+                      type="password"
                       class="form-control"
                       required
-                      placeholder="Enter 6-digit OTP"
-                      maxLength="6"
+                      placeholder="Enter password"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={resendEmailOTP}
-                    class="btn btn-link"
-                    style={{ padding: 0, marginBottom: '1rem' }}
-                  >
-                    Resend OTP
-                  </button>
-                </>
-              )}
-              <button type="submit" disabled={loading.value} class="btn btn-primary w-100">
-                {loading.value 
-                  ? 'Processing...' 
-                  : emailOtpSent.value 
-                  ? 'Verify Email OTP' 
-                  : 'Send Email OTP'}
-              </button>
-            </form>
+                )}
+                {emailOtpSent.value && (
+                  <>
+                    <div class="mb-3">
+                      <label class="form-label">Enter OTP</label>
+                      <input
+                        value={emailOtp.value}
+                        onInput={(e) => emailOtp.value = e.target.value}
+                        type="text"
+                        class="form-control"
+                        required
+                        placeholder="Enter 6-digit OTP"
+                        maxLength="6"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resendEmailOTP}
+                      class="btn btn-link"
+                      style={{ padding: 0, marginBottom: '1rem' }}
+                    >
+                      Resend OTP
+                    </button>
+                  </>
+                )}
+                <button type="submit" disabled={loading.value} class="btn btn-primary w-100">
+                  {loading.value 
+                    ? 'Processing...' 
+                    : emailOtpSent.value 
+                    ? 'Verify Email OTP' 
+                    : 'Send Email OTP'}
+                </button>
+              </form>
+              
+              {/* Google Sign-in button for Step 1 */}
+              <div style={{ marginTop: '1.5rem' }}>
+                <div style={{ textAlign: 'center', margin: '1rem 0', color: '#6b7280' }}>
+                  Or sign up with
+                </div>
+                <div id="g_id_signup" style={{ display: 'flex', justifyContent: 'center' }}></div>
+              </div>
+            </>
           )}
 
           {/* Step 2: Mobile OTP */}
